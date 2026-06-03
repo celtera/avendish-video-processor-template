@@ -1,0 +1,169 @@
+name: CMake build
+
+on: push
+
+# Video / texture objects map onto these Avendish back-ends (see avnd_make_texture):
+#
+#   * Godot              -> a GDExtension Node exposing an ImageTexture
+#   * TouchDesigner TOP  -> a Texture Operator
+#   * Max/MSP            -> a Jitter matrix / texture object
+#   * GStreamer          -> a video/x-raw element (source / transform / sink)
+#   * ossia score        -> a texture process (needs libossia; not exercised here)
+#
+# Each of the three template objects (Generator / Filter / Sink) is emitted for every
+# back-end. This workflow builds the native back-ends on Linux, Windows and macOS.
+#   - godot-cpp is fetched automatically by CMake (no SDK to provide).
+#   - The TouchDesigner TOP back-end uses the Custom Operator SDK headers from
+#     https://github.com/jcelerier/CustomOperatorSamples (its include/ ships the TOP base
+#     header + CPlusPlus_Common.h; TOP needs only the public headers).
+#   - The Max/MSP (Jitter) object uses the Max SDK headers from
+#     https://github.com/jcelerier/max-sdk-base.
+#   - GStreamer needs its development packages; they are installed best-effort on Linux
+#     only (avnd_make_gstreamer silently skips when pkg-config can't find them, so the
+#     build stays green on the platforms where they are absent).
+#
+# Toolchain notes (cf. the Avendish reference CI):
+#   - Avendish needs Boost >= 1.87, newer than Ubuntu's system Boost (1.83), so a
+#     header-only Boost 1.90 is downloaded on every platform and passed via BOOST_ROOT.
+#   - Avendish's C++23 reflection needs a recent compiler: Linux uses clang-20 from
+#     apt.llvm.org, macOS uses Xcode 26, Windows uses clang-cl — which is also mandatory
+#     because the TouchDesigner SDK requires the MSVC ABI (it rejects MinGW/GNU).
+
+env:
+  BOOST_URL: "https://github.com/ossia/score-sdk/releases/download/sdk31/boost_1_90_0.tar.gz"
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: "Linux",
+              os: ubuntu-24.04,
+              triple: "linux-clang-x86_64",
+              dependencies: "sudo apt update ; \
+                             curl -L https://apt.llvm.org/llvm.sh > llvm.sh ; \
+                             chmod +x ./llvm.sh ; \
+                             sudo ./llvm.sh 20 ; \
+                             sudo apt install -y ninja-build clang-20 lld-20 ; \
+                             sudo apt install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libglib2.0-dev libjson-glib-dev libsoup2.4-dev || true",
+              common_flags: "-DCMAKE_C_COMPILER=clang-20 \
+                             -DCMAKE_CXX_COMPILER=clang++-20 \
+                             -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld-20 \
+                             -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld-20 \
+                             -DCMAKE_MODULE_LINKER_FLAGS=-fuse-ld=lld-20"
+            }
+          - {
+              # clang-cl (not cl): MSVC ABI (required by the TouchDesigner SDK) with the
+              # Clang front-end. Plain MSVC emits an external reference for Avendish's
+              # `extern const fake_object_for_indices` (used only in constexpr), which
+              # then fails to link; Clang correctly elides it, like on Linux/macOS.
+              name: "Windows",
+              os: windows-latest,
+              triple: "windows-clang-x86_64",
+              dependencies: "choco install -y ninja llvm",
+              common_flags: "-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl"
+            }
+          - {
+              name: "macOS",
+              os: macos-26,
+              triple: "macos-clang-aarch64",
+              dependencies: "brew install ninja",
+              common_flags: ""
+            }
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # TouchDesigner Custom Operator SDK headers (TOP), consumed via its include/
+      # directory. Avendish expects ${TOUCHDESIGNER_SDK_PATH}/include/.
+      - name: Checkout TouchDesigner SDK headers
+        uses: actions/checkout@v4
+        with:
+          repository: jcelerier/CustomOperatorSamples
+          # The TOP back-end only needs the public headers; this fork's add-pop-headers
+          # branch is a known-good superset of them (it also bundles the experimental POP
+          # headers used by the geometry template). Any branch with include/ works.
+          ref: add-pop-headers
+          path: touchdesigner-sdk
+
+      # Max SDK headers (jit/max/msp + the Jitter stack), consumed via AVND_MAXSDK_PATH.
+      - name: Checkout Max SDK
+        uses: actions/checkout@v4
+        with:
+          repository: jcelerier/max-sdk-base
+          submodules: "recursive"
+          path: max-sdk-base
+
+      - name: Select Xcode 26 (macOS)
+        if: runner.os == 'macOS'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+
+      # The TouchDesigner SDK requires the MSVC ABI; set up the MSVC environment so that
+      # cl / Ninja are usable on Windows.
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          ${{ matrix.config.dependencies }}
+
+      - name: Set up Boost
+        shell: bash
+        run: |
+          curl -fsSL "$BOOST_URL" -o boost.tar.gz
+          mkdir -p boost/include
+          tar -xzf boost.tar.gz --strip-components=1 --directory boost/include
+
+      - name: Build release
+        shell: bash
+        run: |
+          export BUILD_DIR=build-release
+          export INSTALL_DIR="$PWD/install"
+          mkdir -p "$INSTALL_DIR"
+          export VERBOSE=1
+
+          cmake -S "$PWD" -B "$BUILD_DIR" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=1 \
+            -DTOUCHDESIGNER_SDK_PATH="$PWD/touchdesigner-sdk" \
+            -DAVND_MAXSDK_PATH="$PWD/max-sdk-base" \
+            -DBOOST_ROOT="$PWD/boost" \
+            -DBoost_NO_BOOST_CMAKE=ON \
+            -DCMAKE_POLICY_DEFAULT_CMP0167=OLD \
+            ${{ matrix.config.common_flags }}
+
+          # Build everything: the texture back-ends (Godot / TouchDesigner TOP / Max,
+          # plus GStreamer where its packages are present) for all three objects, with
+          # no per-platform target list to maintain.
+          cmake --build "$BUILD_DIR"
+
+          echo " === build tree === "
+          ls -R "$BUILD_DIR"/godot "$BUILD_DIR"/td "$BUILD_DIR"/max "$BUILD_DIR"/gstreamer 2>/dev/null || true
+
+          shopt -s nullglob
+          for backend in godot td max gstreamer; do
+            [ -d "$BUILD_DIR/$backend" ] || continue
+            (
+              cd "$BUILD_DIR/$backend"
+              for file in *; do
+                [ -f "$file" ] || continue
+                cmake -E tar cf "$INSTALL_DIR/$backend-${{ matrix.config.triple }}-$file.zip" --format=zip -- "$file"
+              done
+            )
+          done
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config.triple }}
+          path: |
+            install/*
