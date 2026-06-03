@@ -39,6 +39,20 @@ function(add_video_object target main_class c_name source impl)
     C_NAME ${c_name}
   )
 
+  # Workaround: avnd_make_python builds the module as a plain shared library, so it
+  # inherits the platform-default name (lib-prefixed .dylib on macOS, .dll on Windows).
+  # CPython only imports an extension module from a file named "<module>.so" (Unix) or
+  # "<module>.pyd" (Windows) with no "lib" prefix, so force that here — otherwise the
+  # module is unimportable on macOS/Windows (Linux's default .so happens to work).
+  if(TARGET ${target}_python)
+    set_target_properties(${target}_python PROPERTIES PREFIX "")
+    if(WIN32)
+      set_target_properties(${target}_python PROPERTIES SUFFIX ".pyd")
+    else()
+      set_target_properties(${target}_python PROPERTIES SUFFIX ".so")
+    endif()
+  endif()
+
   # Workaround: when godot-cpp is pulled in via FetchContent, its only targets are
   # `godot-cpp` (+ alias `godot::cpp`) — there is no `godot-cpp::godot-cpp`. Avendish's
   # avnd_make_godot doesn't always resolve the target, so the generated headers under
