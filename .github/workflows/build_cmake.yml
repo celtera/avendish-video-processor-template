@@ -159,6 +159,11 @@ jobs:
           # modules, for all three objects, with no per-platform target list to maintain.
           cmake --build "$BUILD_DIR"
 
+          # Run the Python back-end unit tests. CMake registers them whenever the Python
+          # modules were built, which is always the case here (pybind11 + a dev-headers
+          # Python are installed above), so this exercises a real test on every platform.
+          ctest --test-dir "$BUILD_DIR" --output-on-failure
+
           echo " === build tree === "
           ls -R "$BUILD_DIR"/godot "$BUILD_DIR"/td "$BUILD_DIR"/max "$BUILD_DIR"/gstreamer "$BUILD_DIR"/python 2>/dev/null || true
 

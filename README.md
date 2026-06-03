@@ -147,6 +147,21 @@ import pymy_video_filter
 fx = pymy_video_filter.my_video_filter()
 ```
 
+#### Testing through the Python back-end
+
+`tests/test_python_bindings.py` is a worked example of unit-testing an Avendish object
+from Python: it imports the compiled modules, sets parameters, ticks each object with
+`process()`, and reads state back (e.g. the sink's `Luminance` output). When the Python
+modules are built, CMake registers it as a CTest test, so:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+runs it against the freshly built modules with the matching interpreter. The CI runs this
+on every platform. (A compiled extension only imports under the same Python it was built
+with — the test is pointed at the right interpreter and module directory automatically.)
+
 ### ossia score
 
 Install [libossia](https://github.com/ossia/libossia) (or build score and point CMake at

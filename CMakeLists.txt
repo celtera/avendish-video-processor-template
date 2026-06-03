@@ -53,3 +53,27 @@ endfunction()
 add_video_object(MyVideoGenerator MyVideoGenerator my_video_generator src/Generator.hpp src/Generator.cpp)
 add_video_object(MyVideoFilter    MyVideoFilter    my_video_filter    src/Filter.hpp    src/Filter.cpp)
 add_video_object(MyVideoSink      MyVideoSink      my_video_sink      src/Sink.hpp      src/Sink.cpp)
+
+# Unit tests exercising the Python back-end (tests/test_python_bindings.py). Registered
+# only when the Python modules were actually built (pybind11 + Python dev headers found).
+# Run with: ctest --test-dir <build> --output-on-failure
+#
+# Re-resolve the interpreter in this scope (Avendish found it GLOBAL, but the
+# Python_EXECUTABLE variable lives in the package's scope, not ours); this reuses the
+# cache and is the same interpreter the modules were compiled against.
+find_package(Python COMPONENTS Interpreter QUIET)
+if(TARGET MyVideoGenerator_python AND Python_EXECUTABLE)
+  enable_testing()
+
+  add_test(
+    NAME python_bindings
+    COMMAND "${Python_EXECUTABLE}" -m unittest discover
+            -s "${CMAKE_CURRENT_SOURCE_DIR}/tests" -p "test_*.py" -v
+  )
+
+  # The compiled extension modules only import under the interpreter that built them;
+  # point the test at the build's python/ output dir and run it with that same Python.
+  set_tests_properties(python_bindings PROPERTIES
+    ENVIRONMENT "AVND_PYTHON_MODULE_DIR=$<TARGET_FILE_DIR:MyVideoGenerator_python>"
+  )
+endif()
