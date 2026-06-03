@@ -56,3 +56,7 @@ Documentation/Doc_sources/score-documentation/site
 .cmake
 
 .vscode
+
+# Python
+__pycache__/
+*.pyc
