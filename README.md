@@ -36,6 +36,7 @@ For each of the three objects you get:
 | **Godot** | `GDExtension` node exposing an `ImageTexture` | none — `godot-cpp` is fetched automatically |
 | **Max/MSP** | Jitter matrix / texture object | Max SDK |
 | **GStreamer** | `video/x-raw` element (source / transform / sink) | GStreamer development packages |
+| **Python** | an importable extension module (`py<c_name>`) | pybind11 + Python dev headers |
 | **ossia score** | texture process | libossia |
 
 Back-ends whose SDK is not provided are silently skipped, so you can build just the ones
@@ -125,6 +126,26 @@ This produces a Jitter object per object (`build/max/my_video_*.{mxo,mxe64,so}`)
 Install the GStreamer development packages (so that `pkg-config` finds `gstreamer-1.0` and
 friends); each object then builds as a `video/x-raw` element under `build/gstreamer/`
 (a source for the generator, a transform for the filter, a sink for the sink).
+
+### Python
+
+Install [pybind11](https://github.com/pybind/pybind11) and the Python development headers,
+then point CMake at pybind11's CMake package:
+
+```bash
+python -m pip install pybind11
+cmake -S . -B build -G Ninja \
+  -Dpybind11_DIR="$(python -m pybind11 --cmakedir)"
+cmake --build build
+```
+
+This produces one extension module per object under `build/python/` (`pymy_video_*.so` /
+`.pyd`), importable straight from Python:
+
+```python
+import pymy_video_filter
+fx = pymy_video_filter.my_video_filter()
+```
 
 ### ossia score
 

@@ -111,6 +111,17 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      # A consistent Python with development headers on every platform, so the Python
+      # extension-module back-end (avnd_make_python) can compile and link against it.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pybind11
+        shell: bash
+        run: python -m pip install --upgrade pip pybind11
+
       - name: Install dependencies
         shell: bash
         run: |
@@ -136,26 +147,30 @@ jobs:
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=1 \
             -DTOUCHDESIGNER_SDK_PATH="$PWD/touchdesigner-sdk" \
             -DAVND_MAXSDK_PATH="$PWD/max-sdk-base" \
+            -DPython_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')" \
+            -Dpybind11_DIR="$(python -m pybind11 --cmakedir)" \
             -DBOOST_ROOT="$PWD/boost" \
             -DBoost_NO_BOOST_CMAKE=ON \
             -DCMAKE_POLICY_DEFAULT_CMP0167=OLD \
             ${{ matrix.config.common_flags }}
 
           # Build everything: the texture back-ends (Godot / TouchDesigner TOP / Max,
-          # plus GStreamer where its packages are present) for all three objects, with
-          # no per-platform target list to maintain.
+          # plus GStreamer where its packages are present) and the Python extension
+          # modules, for all three objects, with no per-platform target list to maintain.
           cmake --build "$BUILD_DIR"
 
           echo " === build tree === "
-          ls -R "$BUILD_DIR"/godot "$BUILD_DIR"/td "$BUILD_DIR"/max "$BUILD_DIR"/gstreamer 2>/dev/null || true
+          ls -R "$BUILD_DIR"/godot "$BUILD_DIR"/td "$BUILD_DIR"/max "$BUILD_DIR"/gstreamer "$BUILD_DIR"/python 2>/dev/null || true
 
           shopt -s nullglob
-          for backend in godot td max gstreamer; do
+          for backend in godot td max gstreamer python; do
             [ -d "$BUILD_DIR/$backend" ] || continue
             (
               cd "$BUILD_DIR/$backend"
+              # -e (not -f): the macOS Max object is a .mxo *bundle* (a directory), which
+              # cmake -E tar archives recursively; a -f test would silently drop it.
               for file in *; do
-                [ -f "$file" ] || continue
+                [ -e "$file" ] || continue
                 cmake -E tar cf "$INSTALL_DIR/$backend-${{ matrix.config.triple }}-$file.zip" --format=zip -- "$file"
               done
             )

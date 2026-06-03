@@ -17,12 +17,22 @@ include(dependencies.cmake)
 #   - TouchDesigner TOP (Texture Operator)
 #   - Godot GDExtension (a Node exposing an ImageTexture)
 #
+# avnd_make_python additionally emits a Python extension module (py<c_name>) per
+# object, importable from Python (requires pybind11 + the Python dev headers).
+#
 # The relevant SDK paths must be passed to CMake for the optional back-ends to be
 # built (see the README). Back-ends whose SDK is not found are silently skipped.
 function(add_video_object target main_class c_name source impl)
   add_library(${target} STATIC "${impl}" "${source}")
 
   avnd_make_texture(
+    TARGET ${target}
+    MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
+    MAIN_CLASS ${main_class}
+    C_NAME ${c_name}
+  )
+
+  avnd_make_python(
     TARGET ${target}
     MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
     MAIN_CLASS ${main_class}
