@@ -27,7 +27,7 @@ what makes it a sink is the absence of a *texture* output.
 
 ## What gets built
 
-The `avnd_make_texture(...)` calls in `CMakeLists.txt` instantiate the texture back-ends.
+The `avnd_addon_object(... BACKENDS ...)` calls in `CMakeLists.txt` instantiate the texture back-ends (and a Python module). The same file also builds as an ossia/score add-on via `find_package(Avendish)`.
 For each of the three objects you get:
 
 | Back-end | Object kind | SDK required |
