@@ -24,14 +24,17 @@ avnd_addon_init(NAME MyVideo)
 #   * MyVideoSink      (src/Sink.hpp)      - a sink:   texture input, no output
 #
 # BACKENDS lists the texture back-ends (ossia, Max/MSP Jitter, GStreamer video, TD TOP,
-# Godot) plus a Python extension module. In a score build the back-end list is ignored
-# and only the ossia process is produced. Back-ends whose SDK is absent are skipped.
+# Godot) plus a Python extension module, and `dump` — the plain-C++ introspection
+# target the portability CI builds (the CATEGORY presets include it implicitly; the
+# explicit BACKENDS form does not, so we list it). In a score build the back-end list
+# is ignored and only the ossia process is produced. Back-ends whose SDK is absent
+# are skipped.
 function(add_video_object main_class c_name source impl)
   avnd_addon_object(
     BASE MyVideo
     C_NAME ${c_name}
     CLASS ${main_class}
-    BACKENDS ossia max gstreamer:TEXTURE touchdesigner:TOP godot:TEXTURE python
+    BACKENDS dump ossia max gstreamer:TEXTURE touchdesigner:TOP godot:TEXTURE python
     MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
     SOURCES "${impl}" "${source}")
 
