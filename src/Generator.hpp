@@ -122,9 +122,12 @@ struct MyVideoGenerator::ui
     halp_meta(layout, halp::layouts::hbox)
     halp_meta(background, halp::colors::dark)
 
-    halp::item<&MyVideoGenerator::ins::width> width;
-    halp::item<&MyVideoGenerator::ins::height> height;
+    // Field names avoid width/height/x/y/scale: score's layout walker treats
+    // members with those names as geometry and tries to read them as qreal.
+    // The control each item binds to is the pointer, not the field name.
+    halp::item<&MyVideoGenerator::ins::width> width_item;
+    halp::item<&MyVideoGenerator::ins::height> height_item;
     halp::item<&MyVideoGenerator::ins::speed> speed;
-    halp::item<&MyVideoGenerator::ins::scale> scale;
+    halp::item<&MyVideoGenerator::ins::scale> scale_item;
   } widgets;
 };
