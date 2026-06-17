@@ -56,7 +56,7 @@ add_video_object(MyVideoGenerator my_video_generator src/Generator.hpp src/Gener
 add_video_object(MyVideoFilter    my_video_filter    src/Filter.hpp    src/Filter.cpp)
 add_video_object(MyVideoSink      my_video_sink      src/Sink.hpp      src/Sink.cpp)
 
-avnd_addon_finalize(NAME MyVideo UUID 7ecd8671-33ca-4362-a514-1076c579c1c2 VERSION 1.0.0)
+avnd_addon_finalize(NAME MyVideo UUID 7ecd8671-33ca-4362-a514-1076c579c1c2 VERSION 1)
 
 # Unit tests exercising the Python back-end (tests/test_python_bindings.py). Registered
 # only when the Python modules were actually built (pybind11 + Python dev headers found).
