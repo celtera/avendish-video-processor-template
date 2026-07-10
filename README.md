@@ -1,5 +1,7 @@
 # Avendish video / texture template
 
+[![Build](https://github.com/celtera/avendish-video-processor-template/actions/workflows/builds.yaml/badge.svg)](https://github.com/celtera/avendish-video-processor-template/actions/workflows/builds.yaml)
+
 This provides a basic, canonical template for making **video / texture** objects with
 [Avendish](https://github.com/celtera/avendish): a single C++ object that processes RGBA
 frames and is compiled, without rewrite, to several host plug-in formats.
